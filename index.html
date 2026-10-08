@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AIM CONTROL • License</title>
+<style>
+*{box-sizing:border-box;font-family:Segoe UI,sans-serif}
+body{margin:0;padding:20px;background:radial-gradient(circle at top,#1a1a2e,#0f0f1a);color:#eee;min-height:100vh}
+.card{max-width:720px;margin:40px auto;background:rgba(255,255,255,.05);border:1px solid #333;border-radius:18px;padding:28px;backdrop-filter:blur(12px)}
+h1{text-align:center;background:linear-gradient(90deg,#00d4ff,#7b2ff7);-webkit-background-clip:text;color:transparent}
+.sub{text-align:center;color:#888;font-size:13px}
+input,select,button{width:100%;padding:12px;margin-top:10px;border-radius:10px;border:1px solid #333;background:#16162a;color:#fff}
+button{cursor:pointer;background:linear-gradient(90deg,#00d4ff,#7b2ff7);border:0;font-weight:700}
+.secondary{background:#24243a}.danger{background:linear-gradient(90deg,#ff416c,#ff4b2b)}
+.hidden{display:none}.msg{margin-top:12px;padding:10px;border-radius:8px;text-align:center}.ok{color:#00ff9d;background:#00ff9d18}.err{color:#ff6b6b;background:#ff6b6b18}
+.device{font-family:monospace;text-align:center;background:#11111e;padding:12px;border-radius:10px;margin:15px 0;color:#00d4ff}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:20px}
+.feature{padding:15px;background:#16162a;border:1px solid #292943;border-radius:12px;text-align:center}.feature.active{border-color:#00d4ff;background:#00d4ff18}
+.range{margin-top:14px;background:#16162a;padding:14px;border-radius:12px}.range span{float:right;color:#00d4ff}
+</style>
+</head>
+<body>
+<div class="card">
+  <div id="login">
+    <h1>🔑 Kích Hoạt</h1>
+    <p class="sub">Key được khóa theo Device ID của thiết bị</p>
+    <div class="device">Device ID: <b id="deviceId">...</b></div>
+    <input id="key" placeholder="HK-XXXX-XXXX">
+    <button onclick="activate()">Kích Hoạt</button>
+    <div id="msg" class="msg hidden"></div>
+  </div>
+
+  <div id="app" class="hidden">
+    <h1>🚀 AIM CONTROL</h1>
+    <p class="sub">License đã được xác thực</p>
+    <div class="device">Thiết bị: <b id="appDevice"></b></div>
+    <div id="remain" style="text-align:center;margin:15px"></div>
+
+    <div class="grid">
+      <button class="feature" onclick="toggle(this)">Bám Đầu</button>
+      <button class="feature" onclick="toggle(this)">Nhẹ Tâm</button>
+      <button class="feature" onclick="toggle(this)">Ghìm Tâm</button>
+      <button class="feature" onclick="toggle(this)">Đàm Tâm</button>
+      <button class="feature" onclick="toggle(this)">Sensitivity Boost</button>
+      <button class="feature" onclick="toggle(this)">Nhạy Màn</button>
+      <button class="feature" onclick="toggle(this)">Buff Màn</button>
+      <button class="feature" onclick="toggle(this)">Fix Lỗ Đầu</button>
+      <button class="feature" onclick="toggle(this)">AimFlow</button>
+      <button class="feature" onclick="toggle(this)">HeadLock</button>
+      <button class="feature" onclick="toggle(this)">DragBoost</button>
+      <button class="feature" onclick="toggle(this)">AimSnap</button>
+      <button class="feature" onclick="toggle(this)">Crosshair Pro</button>
+      <button class="feature" onclick="toggle(this)">FlickAssist</button>
+    </div>
+
+    <div class="range">
+      Sensitivity <span id="r1">0%</span>
+      <input type="range" min="0" max="100" oninput="r1.textContent=this.value+'%'">
+    </div>
+    <div class="range">
+      Shake Fix <span id="r2">0%</span>
+      <input type="range" min="0" max="100" oninput="r2.textContent=this.value+'%'">
+    </div>
+    <button class="secondary" onclick="logout()">Đăng Xuất</button>
+  </div>
+</div>
+
+<script>
+const API = location.origin + "/api";
+
+function getDeviceId(){
+  let id=localStorage.getItem("device_id");
+  if(!id){
+    const bytes=crypto.getRandomValues(new Uint8Array(8));
+    id="DEV-"+[...bytes].map(x=>x.toString(16).padStart(2,"0")).join("").toUpperCase();
+    localStorage.setItem("device_id",id);
+  }
+  return id;
+}
+const DEVICE_ID=getDeviceId();
+deviceId.textContent=DEVICE_ID;
+appDevice.textContent=DEVICE_ID;
+
+function message(t,ok=false){
+  msg.textContent=t; msg.className="msg "+(ok?"ok":"err");
+}
+async function activate(){
+  const key=document.getElementById("key").value.trim().toUpperCase();
+  if(!key)return message("Nhập key đi!");
+  try{
+    const res=await fetch(API+"/activate",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({key,deviceId:DEVICE_ID})
+    });
+    const data=await res.json();
+    if(!res.ok)return message(data.error||"Key không hợp lệ");
+    localStorage.setItem("license",JSON.stringify(data.license));
+    showApp(data.license);
+  }catch(e){message("Không kết nối được máy chủ");}
+}
+function showApp(license){
+  login.classList.add("hidden"); app.classList.remove("hidden");
+  if(license.forever){remain.innerHTML="♾️ KEY VĨNH VIỄN";return;}
+  tick(license.expires);
+  if(window.timer)clearInterval(window.timer);
+  window.timer=setInterval(()=>tick(license.expires),1000);
+}
+function tick(exp){
+  let left=exp-Date.now();
+  if(left<=0){logout();message("⛔ Key đã hết hạn!");return}
+  let h=Math.floor(left/3600000),m=Math.floor(left%3600000/60000),s=Math.floor(left%60000/1000);
+  remain.textContent=`Còn lại: ${h}h ${m}m ${s}s`;
+}
+function toggle(el){el.classList.toggle("active")}
+function logout(){
+  localStorage.removeItem("license");
+  app.classList.add("hidden");login.classList.remove("hidden");
+  key.value="";
+  if(window.timer)clearInterval(window.timer);
+}
+const saved=localStorage.getItem("license");
+if(saved){try{showApp(JSON.parse(saved))}catch(e){logout()}}
+</script>
+</body>
+</html>
